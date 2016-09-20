@@ -141,21 +141,23 @@ namespace IdentityServer3.AccessTokenValidation
             try
             {
                 var result = AsyncHelper.RunSync(async () => await _configurationManager.GetConfigurationAsync());
-                
+
                 if (result.JsonWebKeySet == null)
                 {
                     _logger.WriteError("Discovery document has no configured signing key. aborting.");
-                    throw new InvalidOperationException("Discovery document has no configured signing key. aborting.");
+                }
+                else
+                {
+                    var tokens = from key in result.JsonWebKeySet.Keys
+                                 select new X509SecurityToken(new X509Certificate2(Convert.FromBase64String(key.X5c.First())), key.Kid);
+
+                    _tokens = tokens;
                 }
 
-                var tokens = from key in result.JsonWebKeySet.Keys
-                             select new X509SecurityToken(new X509Certificate2(Convert.FromBase64String(key.X5c.First())), key.Kid);
-                
                 _issuer = result.Issuer;
-                _tokens = tokens;
                 _syncAfter = DateTimeOffset.UtcNow + _refreshInterval;
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 _logger.WriteError("Error contacting discovery endpoint: " + ex.ToString());
                 throw;
